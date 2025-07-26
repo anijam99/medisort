@@ -19,7 +19,6 @@ class VideoSorter:
         self.video_files = []
         self.current_video = None # Stores the filename of the video currently on display
 
-        # --- Threading Safety ---
         self.video_cap = None
         self.stop_playback = threading.Event()
         self.video_lock = threading.Lock()
@@ -32,7 +31,6 @@ class VideoSorter:
         all_files = os.listdir(self.folder_path)
         self.video_files = [f for f in all_files if f.lower().endswith((".mp4", ".mov", ".avi", ".mkv", ".webm"))]
         
-        # Filter out files that might be in tier subdirectories already
         self.video_files = [f for f in self.video_files if os.path.isfile(os.path.join(self.folder_path, f))]
         
         random.shuffle(self.video_files)
@@ -46,14 +44,11 @@ class VideoSorter:
         self.display_frame_from_queue()
 
     def on_tier_select(self, tier):
-        """Signals the stop and triggers the transition to the next video."""
         if not self.stop_playback.is_set():
             self.stop_playback.set()
-            # Pass the selected tier to next_video, which will handle the file move
             self.next_video(tier_for_previous=tier)
 
     def move_file(self, video_to_move, tier):
-        """Moves the specified video file to its new tier folder."""
         src = os.path.join(self.folder_path, video_to_move)
         dst = os.path.join(self.folder_path, tier, video_to_move)
         try:
@@ -63,21 +58,14 @@ class VideoSorter:
             messagebox.showerror("File Move Error", f"Could not move file: {video_to_move}\n\nError: {e}")
 
     def next_video(self, tier_for_previous=None):
-        """
-        Manages the transition: releases the old video, moves the file, and loads the new video.
-        This is the core of the fix.
-        """
-        # --- 1. Cleanup and File Move ---
         with self.video_lock:
             if self.video_cap:
-                self.video_cap.release() # This releases the file handle.
+                self.video_cap.release()
             self.video_cap = None
-        
-        # Now that the file is released, move the *previous* video if a tier was selected.
+
         if tier_for_previous and self.current_video:
             self.move_file(self.current_video, tier_for_previous)
 
-        # --- 2. Load Next Video ---
         if not self.video_files:
             messagebox.showinfo("Done", "All videos have been sorted!")
             self.on_window_close()
@@ -86,7 +74,7 @@ class VideoSorter:
         self.current_video = self.video_files.pop()
         video_path = os.path.join(self.folder_path, self.current_video)
         
-        self.stop_playback.clear() # Reset the event for the new video
+        self.stop_playback.clear()
         new_cap = cv2.VideoCapture(video_path)
 
         with self.video_lock:
@@ -125,7 +113,6 @@ class VideoSorter:
             time.sleep(0.02)
 
     def display_frame_from_queue(self):
-        """Gets frames from the queue and displays them."""
         try:
             frame = self.frame_queue.get_nowait()
             img = Image.fromarray(frame)
@@ -142,7 +129,6 @@ class VideoSorter:
                 self.parent_window.after(15, self.display_frame_from_queue)
 
     def on_window_close(self):
-        """Stops video, cleans up resources, and calls the main window callback."""
         self.stop_playback.set()
         with self.video_lock:
             if self.video_cap:
