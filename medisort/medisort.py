@@ -26,6 +26,11 @@ class MediaSorterApp:
         self.setup_styles()
         self.create_widgets()
 
+        self.dragging_chip = None
+        self.dragging_index = None
+        self.placeholder = None
+
+
     def setup_styles(self):
         style = ttk.Style()
         
@@ -367,7 +372,7 @@ class MediaSorterApp:
         for widget in self.chips_frame.winfo_children():
             widget.destroy()
 
-        for cat in self.categories:
+        for i, cat in enumerate(self.categories):
             chip = tk.Frame(self.chips_frame, bg="#e9ecef", padx=8, pady=4)
             chip.pack(side=tk.LEFT, padx=5, pady=5)
 
@@ -378,3 +383,52 @@ class MediaSorterApp:
                                 borderwidth=0, font=("Segoe UI", 9),
                                 command=lambda c=cat: self.remove_category(c))
             remove_btn.pack(side=tk.LEFT, padx=(5, 0))
+
+            chip.bind("<Button-1>", lambda e, idx=i: self.start_drag(e, idx))
+            chip.bind("<B1-Motion>", self.on_drag)
+            chip.bind("<ButtonRelease-1>", self.stop_drag)
+
+    def start_drag(self, event, index):
+        self.dragging_chip = event.widget
+        self.dragging_index = index
+        self.dragging_chip.lift()  # Bring the chip to front
+        self.dragging_chip.start_x = event.x
+        self.dragging_chip.start_y = event.y
+
+    def on_drag(self, event):
+        if not self.dragging_chip:
+            return
+
+        # Move the chip with the mouse
+        x = self.dragging_chip.winfo_x() + event.x - self.dragging_chip.start_x
+        y = self.dragging_chip.winfo_y() + event.y - self.dragging_chip.start_y
+        self.dragging_chip.place(x=x, y=y)  # Temporarily position absolutely
+
+    def stop_drag(self, event):
+        if not self.dragging_chip:
+            return
+
+        # Determine new index based on mouse x position
+        new_index = self.get_drop_position(event.x_root)
+
+        # Reorder categories
+        if new_index is not None and new_index != self.dragging_index:
+            cat = self.categories.pop(self.dragging_index)
+            self.categories.insert(new_index, cat)
+
+        # Reset drag state
+        self.dragging_chip = None
+        self.dragging_index = None
+        self.refresh_chips()
+
+    def get_drop_position(self, x_root):
+        # Calculate where the chip was dropped based on x position
+        positions = []
+        for i, child in enumerate(self.chips_frame.winfo_children()):
+            positions.append((i, child.winfo_rootx()))
+
+        for i, pos_x in positions:
+            if x_root < pos_x + 40:  # 40px buffer
+                return i
+        return len(positions)
+
