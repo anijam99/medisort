@@ -8,7 +8,7 @@ class MediaSorterApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Media Sorter")
-        self.root.geometry("500x600")
+        self.root.geometry("500x700")
         self.root.resizable(True, True)
         
         self.root.configure(bg='#f8f9fa')
@@ -113,7 +113,7 @@ class MediaSorterApp:
             font=("Segoe UI", 10, "bold"),
             relief="flat",
             borderwidth=2,
-            padx=30,
+            padx=38,
             pady=10,
             command=lambda: self.select_mode("Videos")
         )
@@ -156,26 +156,50 @@ class MediaSorterApp:
     def create_tiers_section(self, parent):
         tiers_section = tk.Frame(parent, bg=self.card_bg)
         tiers_section.pack(fill=tk.X, padx=20, pady=15)
-        
-        label_frame = tk.Frame(tiers_section, bg=self.card_bg)
-        label_frame.pack(fill=tk.X)
-        
-        tk.Label(label_frame,
-                text="Define Your Categories (seprated by comma)",
+
+        tk.Label(tiers_section,
+                text="Define Your Categories",
                 font=("Segoe UI", 11, "bold"),
                 fg="#2c3e50",
-                bg=self.card_bg).pack(side=tk.LEFT)
-    
-        entry_frame = tk.Frame(tiers_section, bg=self.card_bg)
-        entry_frame.pack(fill=tk.X, pady=(10, 0))
-        
-        tiers_entry = ttk.Entry(
-            entry_frame,
-            textvariable=self.tiers_var,
+                bg=self.card_bg).pack(anchor="w")
+
+        helper_label = tk.Label(tiers_section,
+                text="These categories will become sorting buttons. Example: Good, Bad, Skip",
+                font=("Segoe UI", 9),
+                fg=self.secondary_color,
+                bg=self.card_bg,
+                wraplength=400,
+                justify="left")
+        helper_label.pack(anchor="w", pady=(5, 10))
+
+        # Frame for input
+        input_frame = tk.Frame(tiers_section, bg=self.card_bg)
+        input_frame.pack(fill=tk.X)
+
+        self.new_category_var = tk.StringVar()
+        category_entry = ttk.Entry(
+            input_frame,
+            textvariable=self.new_category_var,
             font=("Segoe UI", 10),
             style="Modern.TEntry"
         )
-        tiers_entry.pack(fill=tk.X, ipady=8)
+        category_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, ipady=8, padx=(0, 10))
+
+        add_btn = ttk.Button(
+            input_frame,
+            text="Add",
+            command=self.add_category
+        )
+        add_btn.pack(side=tk.LEFT)
+
+        # Frame for chips
+        self.chips_frame = tk.Frame(tiers_section, bg=self.card_bg)
+        self.chips_frame.pack(fill=tk.X, pady=(10, 0))
+
+        # Initialize category list
+        self.categories = ["Good", "Bad", "Skip"]
+        self.refresh_chips()
+
 
     def create_start_section(self, parent):
         start_section = tk.Frame(parent, bg=self.card_bg)
@@ -249,7 +273,7 @@ class MediaSorterApp:
 
     def start_sorting(self):
         folder_path = self.folder_path_var.get()
-        tiers = [tier.strip() for tier in self.tiers_var.get().split(',') if tier.strip()]
+        tiers = self.categories
 
         if not folder_path or not os.path.isdir(folder_path):
             messagebox.showerror("Invalid Folder", 
@@ -322,3 +346,35 @@ class MediaSorterApp:
             btn.bind("<Leave>", lambda e, b=btn: b.config(bg=self.primary_color))
 
         sorter_logic.start()
+
+    def add_category(self):
+        new_cat = self.new_category_var.get().strip()
+        if new_cat and new_cat not in self.categories:
+            if len(self.categories) >= 8:
+                messagebox.showwarning("Limit Reached", "You can only have up to 8 categories.")
+                return
+            self.categories.append(new_cat)
+            self.new_category_var.set("")
+            self.refresh_chips()
+        elif new_cat in self.categories:
+            messagebox.showinfo("Duplicate", "This category already exists.")
+
+    def remove_category(self, category):
+        self.categories.remove(category)
+        self.refresh_chips()
+
+    def refresh_chips(self):
+        for widget in self.chips_frame.winfo_children():
+            widget.destroy()
+
+        for cat in self.categories:
+            chip = tk.Frame(self.chips_frame, bg="#e9ecef", padx=8, pady=4)
+            chip.pack(side=tk.LEFT, padx=5, pady=5)
+
+            lbl = tk.Label(chip, text=cat, bg="#e9ecef", fg="#343a40", font=("Segoe UI", 10, "bold"))
+            lbl.pack(side=tk.LEFT)
+
+            remove_btn = tk.Button(chip, text="✕", bg="#e9ecef", fg="#6c757d",
+                                borderwidth=0, font=("Segoe UI", 9),
+                                command=lambda c=cat: self.remove_category(c))
+            remove_btn.pack(side=tk.LEFT, padx=(5, 0))
